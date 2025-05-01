@@ -3,7 +3,10 @@ import ColorPalette from './ColorPalette';
 import Settings from './Settings';
 import ImageUploader from './ImageUploader';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Save, Trash2, Upload } from 'lucide-react';
+import PatternViewer from './PatternViewer';
+import { exportAsPng } from '../utils/exportUtils';
+import { useEditorStore } from '../store/editorStore';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -56,9 +59,19 @@ const AccordionSection: React.FC<AccordionSectionProps> = ({
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
+  const {
+    saveToLocalStorage,
+    exportAsJson,
+    importFromJson,
+    clearGrid
+  } = useEditorStore();
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   // Estado para controlar qué acordeones están abiertos
   const [openSections, setOpenSections] = useState({
-    colorPalette: true,  // Abierto por defecto
+    colorPalette: true,
+    saveImportExport: false,
     imageUploader: false,
     settings: false
   });
@@ -69,6 +82,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        if (event.target?.result) {
+          const jsonData = JSON.parse(event.target.result as string);
+          importFromJson(jsonData);
+        }
+      } catch (error) {
+        alert(`Invalid file format. Please upload a valid JSON file: ${error}`);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -82,6 +118,82 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
           className="w-80 shrink-0 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 overflow-y-auto fixed right-0 top-0 bottom-0 z-20 md:relative"
         >
           <div className="p-4 space-y-4">
+            <PatternViewer />
+
+            {/* Save/Export/Import */}
+            <AccordionSection
+              title="Save/Export/Import"
+              isOpen={openSections.saveImportExport}
+              onToggle={() => toggleSection('saveImportExport')}
+            >
+              <div className="space-y-2">
+                <button
+                  className="btn-secondary py-2 w-full flex items-center justify-center"
+                  onClick={saveToLocalStorage}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Project
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="btn-secondary py-2 flex items-center justify-center"
+                    onClick={() => exportAsPng(false)}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Export PNG
+                  </button>
+
+                  <button
+                    className="btn-secondary py-2 flex items-center justify-center"
+                    onClick={() => exportAsPng(true)}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    PNG with Grid
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className="btn-secondary py-2 flex items-center justify-center"
+                    onClick={exportAsJson}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Export JSON
+                  </button>
+
+                  <div className="relative">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileUpload}
+                      className="sr-only"
+                      id="json-file-upload"
+                    />
+                    <label
+                      htmlFor="json-file-upload"
+                      className="btn-secondary py-2 flex items-center justify-center cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      Import JSON
+                    </label>
+                  </div>
+                </div>
+
+                <button
+                  className="btn-secondary py-2 w-full flex items-center justify-center text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to clear the grid? This action cannot be undone.')) {
+                      clearGrid();
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clear Grid
+                </button>
+              </div>
+            </AccordionSection>
+
             <AccordionSection
               title="Color Palette"
               isOpen={openSections.colorPalette}
